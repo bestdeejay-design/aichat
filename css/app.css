@@ -99,7 +99,7 @@ body {
 .chat-bar {
   display: flex; gap: 8px; align-items: flex-end;
   padding: 10px 16px 14px; background: var(--bg);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border); flex-shrink: 0;
 }
 .chat-bar textarea {
   flex: 1; padding: 10px 14px; border-radius: 10px;
