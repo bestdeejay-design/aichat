@@ -33,6 +33,7 @@ body {
 }
 .top-left, .top-right { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .brand { font: 700 14px var(--font); color: var(--accent); letter-spacing: 0.5px; white-space: nowrap; }
+.ver { font-size: 9px; color: var(--text3); letter-spacing: 0.3px; padding: 1px 5px; border-radius: 4px; background: var(--surface); }
 #modelSelect {
   max-width: 240px; padding: 4px 8px; border-radius: 6px;
   border: 1px solid var(--border); background: var(--surface);
