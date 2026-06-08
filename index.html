@@ -2,11 +2,11 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI Chat</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>💬</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -14,64 +14,56 @@
   <header id="topBar">
     <div class="top-left">
       <span class="brand">AI Chat</span>
-      <span class="pill" id="providerPill">—</span>
+      <select id="modelSelect" onchange="switchModel(this.value)" title="Модель"></select>
     </div>
     <div class="top-right">
+      <span class="pill" id="providerPill">—</span>
       <button class="btn-icon" onclick="toggleSettings()" title="Настройки">⚙️</button>
-      <button class="btn-icon" onclick="clearChat()" title="Очистить">🗑️</button>
+      <button class="btn-icon" onclick="refreshModels()" title="Обновить модели">↻</button>
+      <button class="btn-icon" onclick="clearChat()" title="Очистить чат">🗑️</button>
     </div>
   </header>
 
   <main id="content">
     <div class="welcome" id="welcomeScreen">
-      <div class="welcome-icon">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      </div>
       <h1>AI Chat</h1>
-      <p>Выберите провайдера и начните общаться</p>
+      <p>Выберите провайдера</p>
       <div class="quick-providers">
         <button class="provider-btn" onclick="quickConnect('github')">
-          <span class="provider-dot" style="background:#6e40c9"></span>
+          <span class="pdot" style="background:#6e40c9"></span>
           <span>GitHub Models</span>
-          <span class="provider-check">→</span>
+          <span class="parrow">→</span>
         </button>
         <button class="provider-btn" onclick="quickConnect('deepseek')">
-          <span class="provider-dot" style="background:#4f6bff"></span>
+          <span class="pdot" style="background:#4f6bff"></span>
           <span>DeepSeek</span>
-          <span class="provider-check">→</span>
+          <span class="parrow">→</span>
         </button>
         <button class="provider-btn" onclick="quickConnect('openrouter')">
-          <span class="provider-dot" style="background:#ff6b35"></span>
+          <span class="pdot" style="background:#ff6b35"></span>
           <span>OpenRouter</span>
-          <span class="provider-check">→</span>
+          <span class="parrow">→</span>
         </button>
       </div>
-      <button class="btn-text" onclick="toggleSettings()">Другой провайдер →</button>
+      <button class="btn-text" onclick="toggleSettings()">Другой провайдер</button>
     </div>
 
     <div class="chat-layout" id="chatLayout" style="display:none">
       <div class="chat-messages" id="chatMessages"></div>
       <div class="chat-bar">
-        <div class="chat-bar-row">
-          <select id="modelSelect" onchange="switchModel(this.value)" title="Модель"></select>
-          <button class="btn-icon btn-sm" onclick="refreshModels()" title="Обновить список моделей">↻</button>
-        </div>
-        <div class="chat-input-wrap">
-          <textarea id="chatInput" rows="1" placeholder="Напишите сообщение..." oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
-          <button class="btn-send" id="sendBtn" onclick="sendMessage()" title="Отправить (Enter)">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-          </button>
-          <button class="btn-stop" id="stopBtn" onclick="stopGeneration()" style="display:none" title="Остановить">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
-          </button>
-        </div>
-        <div class="chat-bar-hint">Enter — отправить · Shift+Enter — новая строка</div>
+        <textarea id="chatInput" rows="1" placeholder="Напишите сообщение..." oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
+        <button class="btn-send" id="sendBtn" onclick="sendMessage()" title="Enter">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        </button>
+        <button class="btn-stop" id="stopBtn" style="display:none" onclick="stopGeneration()" title="Остановить">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+        </button>
       </div>
     </div>
   </main>
 
-  <div class="settings-overlay" id="settingsOverlay" style="display:none" onclick="toggleSettings()">
-    <div class="settings-panel" onclick="event.stopPropagation()">
+  <div class="settings-overlay" id="settingsOverlay" style="display:none">
+    <div class="settings-panel">
       <div class="settings-header">
         <span>Настройки</span>
         <button class="btn-icon" onclick="toggleSettings()">✕</button>
@@ -86,7 +78,7 @@
             <option value="openrouter">OpenRouter</option>
             <option value="openai">OpenAI</option>
             <option value="groq">Groq</option>
-            <option value="custom">Другой (заполнить вручную)</option>
+            <option value="custom">Другой (вручную)</option>
           </select>
         </div>
         <div class="field-group">
@@ -101,11 +93,11 @@
           <label>API Key</label>
           <div class="key-row">
             <input id="apiKey" type="password" placeholder="sk-...">
-            <button class="btn-icon" onclick="toggleKeyVis()" id="keyToggle" title="Показать/скрыть">👁️</button>
+            <button class="btn-icon" onclick="toggleKeyVis()" title="Показать">👁️</button>
           </div>
         </div>
         <details class="advanced-details">
-          <summary class="advanced-summary">Дополнительно</summary>
+          <summary>Ещё</summary>
           <div class="field-group">
             <label>System prompt</label>
             <textarea id="systemPrompt" rows="3" placeholder="Ты — полезный ассистент..."></textarea>

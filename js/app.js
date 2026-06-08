@@ -1,26 +1,41 @@
 /* ═══════════════════════════════════════════
-   AI Chat — Multi-provider chat client
+   AI Chat
    ═══════════════════════════════════════════ */
 
 const PROVIDERS = {
-  github:   { name:'GitHub Models',  url:'https://models.inference.ai.azure.com', key:'' },
-  deepseek: { name:'DeepSeek',       url:'https://api.deepseek.com',              key:'' },
-  openrouter:{ name:'OpenRouter',    url:'https://openrouter.ai/api/v1',          key:'' },
-  openai:   { name:'OpenAI',         url:'https://api.openai.com/v1',             key:'' },
-  groq:     { name:'Groq',           url:'https://api.groq.com/openai/v1',        key:'' }
+  github:    { name:'GitHub Models',  url:'https://models.inference.ai.azure.com',          key:'' },
+  deepseek:  { name:'DeepSeek',       url:'https://api.deepseek.com',                       key:'' },
+  openrouter:{ name:'OpenRouter',     url:'https://openrouter.ai/api/v1',                   key:'' },
+  openai:    { name:'OpenAI',         url:'https://api.openai.com/v1',                      key:'' },
+  groq:      { name:'Groq',           url:'https://api.groq.com/openai/v1',                 key:'' }
 };
+
+// Embedding models to exclude from chat model list
+const EMBED_PATTERNS = /embed|ada|similarity|search|classification|davinci|curie|babbage|whisper|tts|dall-e|moderation|cohere-embed|cohere-rerank|cohere-classify|jina-embed|jina-reranker|minilm|e5-|bge-/i;
+
+const PREFERRED_MODELS = [
+  'gpt-4o-mini','gpt-4o','gpt-4','gpt-3.5-turbo',
+  'deepseek-chat','deepseek-v3','deepseek-r1',
+  'claude-3','claude-3.5','claude-3-opus','claude-3-sonnet','claude-3-haiku',
+  'gemini','gemma',
+  'llama','llama-3','llama-4','llama3',
+  'mistral','mixtral','codestral',
+  'qwen','qwen2',
+  'phi','phi-3','phi-4',
+  'command-r','command-r+',
+  'grok'
+];
 
 let settings = { provider:'', url:'', key:'', systemPrompt:'', temperature:0.7, maxTokens:4096 };
 let models = [];
 let currentModel = '';
 let messages = [];
 let streaming = false;
-let abortController = null;
+let abortCtrl = null;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-/* ─── INIT ─── */
 document.addEventListener('DOMContentLoaded', () => {
   loadSettings();
   if (settings.key) connect();
@@ -45,8 +60,8 @@ function saveSettings() {
   settings.temperature = parseFloat($('temperature').value) || 0.7;
   settings.maxTokens = parseInt($('maxTokens').value) || 4096;
   localStorage.setItem('aichat_settings', JSON.stringify(settings));
-  connect();
   toggleSettings();
+  connect();
 }
 
 function toggleSettings() {
@@ -61,13 +76,12 @@ function toggleKeyVis() {
 }
 
 function applyPreset() {
-  const val = $('presetSelect').value;
-  if (!val || val === 'custom') return;
-  const p = PROVIDERS[val];
+  const v = $('presetSelect').value;
+  if (!v || v === 'custom') return;
+  const p = PROVIDERS[v];
   if (!p) return;
   $('providerName').value = p.name;
   $('apiUrl').value = p.url;
-  if (p.key) $('apiKey').value = p.key;
 }
 
 function quickConnect(id) {
@@ -81,17 +95,17 @@ function quickConnect(id) {
 /* ─── CONNECT ─── */
 async function connect() {
   if (!settings.url || !settings.key) return;
-  setPill('Подключение…');
+  setPill('...');
   const ok = await refreshModels();
   if (ok) {
-    setPill(settings.provider || 'Подключено');
+    setPill(settings.provider || 'ок');
     showChat();
   } else {
-    setPill('Ошибка');
+    setPill('ошибка');
   }
 }
 
-function setPill(text) { $('providerPill').textContent = text; }
+function setPill(t) { $('providerPill').textContent = t; }
 
 async function refreshModels() {
   if (!settings.url || !settings.key) return false;
@@ -100,44 +114,49 @@ async function refreshModels() {
     const res = await fetch(url, { headers: { 'Authorization': `Bearer ${settings.key}` } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    models = (data.data || data).filter(m => m.id).map(m => ({ id: m.id }));
-    if (!models.length) throw new Error('Нет моделей');
+    const all = (data.data || data).filter(m => m.id).map(m => ({ id: m.id }));
+    // Filter out non-chat models
+    models = all.filter(m => !EMBED_PATTERNS.test(m.id));
+    if (!models.length) { models = all; } // fallback
     localStorage.setItem('aichat_models', JSON.stringify({ models, ts: Date.now(), url: settings.url }));
-    renderModelSelect();
-    if (currentModel && models.find(m => m.id === currentModel)) {
-      $('modelSelect').value = currentModel;
-    } else {
-      currentModel = models[0].id;
-      $('modelSelect').value = currentModel;
-    }
-    toast(`Загружено ${models.length} моделей`, 'success');
+
+    const sel = $('modelSelect');
+    sel.innerHTML = models.map(m => `<option value="${esc(m.id)}">${esc(m.id)}</option>`).join('');
+
+    // Auto-select best model
+    const picked = pickBestModel(models);
+    currentModel = picked;
+    sel.value = picked;
+
+    toast(`${models.length} моделей (${all.length - models.length} скрыто)`, 'success');
     return true;
   } catch (e) {
     const cached = loadCachedModels();
     if (cached) {
       models = cached.models;
-      renderModelSelect();
-      currentModel = models[0].id;
-      $('modelSelect').value = currentModel;
-      toast('Использован кэш', 'success');
+      const sel = $('modelSelect');
+      sel.innerHTML = models.map(m => `<option value="${esc(m.id)}">${esc(m.id)}</option>`).join('');
+      currentModel = models[0]?.id || '';
+      sel.value = currentModel;
+      toast('Кэш моделей', 'success');
       return true;
     }
-    toast('Ошибка: ' + e.message, 'error');
+    toast(e.message, 'error');
     return false;
   }
 }
 
 function loadCachedModels() {
-  try {
-    const c = JSON.parse(localStorage.getItem('aichat_models'));
-    if (c && c.url === settings.url && c.models.length) return c;
-  } catch(e) {}
+  try { const c = JSON.parse(localStorage.getItem('aichat_models')); if (c && c.url === settings.url && c.models.length) return c; } catch(e) {}
   return null;
 }
 
-function renderModelSelect() {
-  const sel = $('modelSelect');
-  sel.innerHTML = models.map(m => `<option value="${esc(m.id)}">${esc(m.id)}</option>`).join('');
+function pickBestModel(list) {
+  for (const preferred of PREFERRED_MODELS) {
+    const found = list.find(m => m.id.toLowerCase().includes(preferred));
+    if (found) return found.id;
+  }
+  return list[0]?.id || '';
 }
 
 function switchModel(id) { currentModel = id; }
@@ -149,15 +168,9 @@ function showChat() {
   loadMessages();
 }
 
-function showWelcome() {
-  $('welcomeScreen').style.display = 'flex';
-  $('chatLayout').style.display = 'none';
-  setPill('—');
-}
-
 function clearChat() {
   if (!messages.length) return;
-  if (!confirm('Очистить все сообщения?')) return;
+  if (!confirm('Очистить чат?')) return;
   messages = [];
   saveMessages();
   renderMessages();
@@ -174,42 +187,31 @@ function saveMessages() {
 }
 
 function renderMessages() {
-  const container = $('chatMessages');
-  container.innerHTML = messages.map((m, i) => renderMessage(m, i)).join('');
-  container.scrollTop = container.scrollHeight;
+  const c = $('chatMessages');
+  c.innerHTML = messages.map((m, i) => renderMsg(m, i)).join('');
+  c.scrollTop = c.scrollHeight;
 }
 
-function renderMessage(m, i) {
+function renderMsg(m, i) {
   const role = m.role === 'user' ? 'user' : 'ai';
-  const avatar = role === 'user' ? '👤' : '🤖';
   const extra = m.error ? ' error' : '';
-  const content = esc(m.content || '');
-  const html = formatContent(content);
-  let retryBtn = '';
-  if (m.error) retryBtn = `<button class="retry-btn" onclick="retryMessage(${i})">Повторить →</button>`;
-  return `<div class="msg ${role}${extra}${m.streaming ? ' streaming' : ''}">
-    <div class="avatar">${avatar}</div>
-    <div class="bubble">${html}${retryBtn}</div>
+  const html = fmt(m.content || '');
+  const retry = m.error ? `<button class="retry" onclick="retryMsg(${i})">Повторить</button>` : '';
+  return `<div class="msg ${role}${extra}">
+    <div class="ava">${role === 'user' ? '👤' : '🤖'}</div>
+    <div class="bubble">${html}${retry}</div>
   </div>`;
 }
 
-function formatContent(text) {
+function fmt(text) {
   if (!text) return '';
-  // Code blocks
-  text = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-    const langAttr = lang ? ` data-lang="${esc(lang)}"` : '';
-    return `<pre${langAttr}><button class="copy-btn" onclick="copyText(this.nextSibling.textContent)">⎘</button><code>${esc(code.trimEnd())}</code></pre>`;
-  });
-  // Inline code
+  text = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
+    `<pre><button class="cpy" onclick="copy(this.nextSibling.textContent)">⎘</button><code>${esc(code.trimEnd())}</code></pre>`
+  );
   text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-  // Bold
   text = text.replace(/\*\*(\S[^*]*\S|\S)\*\*/g, '<strong>$1</strong>');
-  // Italic
   text = text.replace(/\*(\S[^*]*\S|\S)\*/g, '<em>$1</em>');
-  // Paragraphs
-  text = text.replace(/\n\n/g, '</p><p>');
-  text = '<p>' + text + '</p>';
-  return text;
+  return text.split(/\n\n+/).filter(Boolean).map(p => `<p>${esc(p)}</p>`).join('') || '<p></p>';
 }
 
 /* ─── SEND ─── */
@@ -221,33 +223,22 @@ async function sendMessage() {
   if (!settings.key) { toggleSettings(); return; }
 
   input.value = '';
-  autoResize(input);
+  input.style.height = 'auto';
 
-  // Add user message
   messages.push({ role: 'user', content: text });
   saveMessages();
   renderMessages();
 
-  // Build request
   const msgs = [];
   if (settings.systemPrompt) msgs.push({ role: 'system', content: settings.systemPrompt });
   messages.forEach(m => msgs.push({ role: m.role, content: m.content }));
 
-  const body = {
-    model: currentModel,
-    messages: msgs,
-    stream: true,
-    temperature: settings.temperature ?? 0.7,
-    max_tokens: settings.maxTokens ?? 4096
-  };
-
-  abortController = new AbortController();
+  abortCtrl = new AbortController();
   streaming = true;
-  showStopBtn();
+  toggleSendStop();
 
-  // Add placeholder for AI response
   messages.push({ role: 'assistant', content: '', streaming: true });
-  const msgIdx = messages.length - 1;
+  const idx = messages.length - 1;
   saveMessages();
   renderMessages();
 
@@ -255,92 +246,79 @@ async function sendMessage() {
     const url = settings.url.replace(/\/+$/,'') + '/chat/completions';
     const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${settings.key}`,
-      },
-      body: JSON.stringify(body),
-      signal: abortController.signal
+      headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${settings.key}` },
+      body: JSON.stringify({
+        model: currentModel,
+        messages: msgs,
+        stream: true,
+        temperature: settings.temperature ?? 0.7,
+        max_tokens: settings.maxTokens ?? 4096
+      }),
+      signal: abortCtrl.signal
     });
 
     if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      messages[msgIdx] = { role: 'assistant', content: `Ошибка ${res.status}: ${errText || res.statusText}`, error: true };
-      saveMessages();
-      renderMessages();
-      finishStream();
-      return;
+      const err = await res.text().catch(() => '');
+      messages[idx] = { role:'assistant', content:`Ошибка ${res.status}: ${err || res.statusText}`, error:true };
+      saveMessages(); renderMessages(); finishStream(); return;
     }
 
     const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let content = '';
-    let buffer = '';
+    const dec = new TextDecoder();
+    let content = '', buf = '';
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
       for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('data: ')) continue;
-        const json = trimmed.slice(6);
+        const t = line.trim();
+        if (!t.startsWith('data: ')) continue;
+        const json = t.slice(6);
         if (json === '[DONE]') continue;
         try {
-          const data = JSON.parse(json);
-          const delta = data.choices?.[0]?.delta?.content;
+          const d = JSON.parse(json);
+          const delta = d.choices?.[0]?.delta?.content;
           if (delta) content += delta;
         } catch(e) {}
       }
-
-      // Batch update via requestAnimationFrame
-      doUpdate(content, msgIdx);
+      scheduleUpdate(content, idx);
     }
 
-    // Process remaining buffer
-    if (buffer.startsWith('data: ')) {
-      const json = buffer.slice(6).trim();
+    if (buf.startsWith('data: ')) {
+      const json = buf.slice(6).trim();
       if (json !== '[DONE]') {
-        try {
-          const data = JSON.parse(json);
-          const delta = data.choices?.[0]?.delta?.content;
-          if (delta) content += delta;
-        } catch(e) {}
+        try { const d = JSON.parse(json); const delta = d.choices?.[0]?.delta?.content; if (delta) content += delta; } catch(e) {}
       }
     }
 
-    messages[msgIdx] = { role: 'assistant', content };
-    saveMessages();
-    renderMessages();
+    messages[idx] = { role:'assistant', content };
+    saveMessages(); renderMessages();
   } catch (e) {
     if (e.name === 'AbortError') {
-      messages[msgIdx] = { role: 'assistant', content: content || '(прервано)' };
+      messages[idx] = { role:'assistant', content: content || '(прервано)' };
     } else {
-      messages[msgIdx] = { role: 'assistant', content: `Ошибка: ${e.message}`, error: true };
+      messages[idx] = { role:'assistant', content: `Ошибка: ${e.message}`, error:true };
     }
-    saveMessages();
-    renderMessages();
+    saveMessages(); renderMessages();
   }
 
   finishStream();
 }
 
-let _updateTimer = null;
-function doUpdate(content, idx) {
-  if (_updateTimer) return;
-  _updateTimer = requestAnimationFrame(() => {
-    _updateTimer = null;
+let _raf = null;
+function scheduleUpdate(content, idx) {
+  if (_raf) return;
+  _raf = requestAnimationFrame(() => {
+    _raf = null;
     messages[idx].content = content;
     saveMessages();
-    // Live update DOM
     const bubbles = $('chatMessages').querySelectorAll('.msg.ai .bubble');
     if (bubbles.length) {
       const last = bubbles[bubbles.length - 1];
-      last.innerHTML = formatContent(esc(content || ''));
+      last.innerHTML = fmt(content || '');
       $('chatMessages').scrollTop = $('chatMessages').scrollHeight;
     }
   });
@@ -348,44 +326,28 @@ function doUpdate(content, idx) {
 
 function finishStream() {
   streaming = false;
-  hideStopBtn();
-  abortController = null;
+  abortCtrl = null;
+  toggleSendStop();
 }
 
-/* ─── STOP ─── */
-function stopGeneration() {
-  if (abortController) abortController.abort();
+function toggleSendStop() {
+  $('sendBtn').style.display = streaming ? 'none' : 'flex';
+  $('stopBtn').style.display = streaming ? 'flex' : 'none';
 }
 
-function showStopBtn() {
-  $('sendBtn').style.display = 'none';
-  $('stopBtn').style.display = 'flex';
-}
+function stopGeneration() { if (abortCtrl) abortCtrl.abort(); }
 
-function hideStopBtn() {
-  $('sendBtn').style.display = 'flex';
-  $('stopBtn').style.display = 'none';
-}
-
-/* ─── RETRY ─── */
-function retryMessage(i) {
+function retryMsg(i) {
   if (i <= 0 || messages[i-1]?.role !== 'user') return;
-  // Remove the error message and the user message before it, re-send
-  const userText = messages[i-1].content;
+  const t = messages[i-1].content;
   messages.splice(i-1, 2);
-  saveMessages();
-  renderMessages();
-  $('chatInput').value = userText;
+  saveMessages(); renderMessages();
+  $('chatInput').value = t;
   autoResize($('chatInput'));
   $('chatInput').focus();
 }
 
-/* ─── COPY ─── */
-function copyText(text) {
-  navigator.clipboard.writeText(text).then(() => {
-    toast('Скопировано', 'success');
-  }).catch(() => {});
-}
+function copy(text) { navigator.clipboard.writeText(text).then(() => toast('Скопировано','success')).catch(()=>{}); }
 
 /* ─── INPUT ─── */
 function autoResize(el) {
@@ -394,24 +356,20 @@ function autoResize(el) {
 }
 
 function handleKey(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  if (e.key === 'Tab') { e.preventDefault();
+    const s = e.target.selectionStart;
+    e.target.value = e.target.value.slice(0,s) + '  ' + e.target.value.slice(e.target.selectionEnd);
+    e.target.selectionStart = e.target.selectionEnd = s + 2;
   }
-  if (e.key === 'Tab') {
-    e.preventDefault();
-    const start = e.target.selectionStart;
-    e.target.value = e.target.value.slice(0, start) + '  ' + e.target.value.slice(e.target.selectionEnd);
-    e.target.selectionStart = e.target.selectionEnd = start + 2;
-  }
+  if (e.key === 'Escape') { e.target.blur(); }
 }
 
 /* ─── TOAST ─── */
-function toast(msg, type = 'info') {
+function toast(msg, type) {
   const t = $('toast');
-  t.textContent = msg;
-  t.className = 'toast' + (type === 'error' ? ' error' : type === 'success' ? ' success' : '');
+  t.textContent = msg; t.className = 'toast' + (type === 'error'?' error':type === 'success'?' success':'');
   t.classList.add('show');
-  clearTimeout(t._hide);
-  t._hide = setTimeout(() => t.classList.remove('show'), 2500);
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove('show'), 2500);
 }
