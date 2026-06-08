@@ -209,7 +209,10 @@ function renderMsg(m, i) {
   const retry = m.error ? `<button class="retry" onclick="retryMsg(${i})">Повторить</button>` : '';
   return `<div class="msg ${role}${extra}">
     <div class="ava">${role === 'user' ? '👤' : '🤖'}</div>
-    <div class="bubble">${html}${retry}</div>
+    <div class="bubble">
+      <button class="msg-copy" onclick="copyMsg(${i})" title="Скопировать">⎘</button>
+      ${html}${retry}
+    </div>
   </div>`;
 }
 
@@ -358,6 +361,7 @@ function retryMsg(i) {
 }
 
 function copy(text) { navigator.clipboard.writeText(text).then(() => toast('Скопировано','success')).catch(()=>{}); }
+function copyMsg(i) { copy(messages[i]?.content || ''); }
 
 /* ─── INPUT ─── */
 function autoResize(el) {
