@@ -14,15 +14,15 @@ const PROVIDERS = {
 const EMBED_PATTERNS = /embed|ada|similarity|search|classification|davinci|curie|babbage|whisper|tts|dall-e|moderation|cohere-embed|cohere-rerank|cohere-classify|jina-embed|jina-reranker|minilm|e5-|bge-/i;
 
 const PREFERRED_MODELS = [
-  'gpt-4o-mini','gpt-4o','gpt-4','gpt-3.5-turbo',
+  'gpt-4o-mini','gpt-4o','gpt-4','gpt-4-turbo','gpt-3.5-turbo',
   'deepseek-chat','deepseek-v3','deepseek-r1',
-  'claude-3','claude-3.5','claude-3-opus','claude-3-sonnet','claude-3-haiku',
-  'gemini','gemma',
-  'llama','llama-3','llama-4','llama3',
-  'mistral','mixtral','codestral',
-  'qwen','qwen2',
-  'phi','phi-3','phi-4',
-  'command-r','command-r+',
+  'claude-3-5-sonnet','claude-3-5-haiku','claude-3-opus','claude-3-sonnet','claude-3-haiku','claude-sonnet','claude-haiku',
+  'gemini-2','gemini-1.5','gemini-pro',
+  'llama-4','llama-3','llama3','llama',
+  'mistral-large','mistral-small','mixtral','codestral',
+  'phi-4','phi-3','phi3','phi',
+  'qwen2','qwen',
+  'command-r+','command-r','command',
   'grok'
 ];
 
@@ -114,7 +114,7 @@ async function refreshModels() {
     const res = await fetch(url, { headers: { 'Authorization': `Bearer ${settings.key}` } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    const all = (data.data || data).filter(m => m.id).map(m => ({ id: m.id }));
+    const all = (data.data || data).filter(m => m.id).map(m => ({ id: normalizeModelId(m.id) }));
     // Filter out non-chat models
     models = all.filter(m => !EMBED_PATTERNS.test(m.id));
     if (!models.length) { models = all; } // fallback
@@ -151,12 +151,22 @@ function loadCachedModels() {
   return null;
 }
 
+function normalizeModelId(id) {
+  // Azure ML format: azureml://registries/{reg}/models/{name}/versions/{v}
+  const m = id.match(/\/models\/([^/]+)/);
+  if (m) return m[1];
+  return id;
+}
+
 function pickBestModel(list) {
+  const id = id => id.toLowerCase();
   for (const preferred of PREFERRED_MODELS) {
-    const found = list.find(m => m.id.toLowerCase().includes(preferred));
+    const found = list.find(m => id(m.id).includes(preferred));
     if (found) return found.id;
   }
-  return list[0]?.id || '';
+  // Fallback: pick any model without "embed" "ada" "whisper" etc
+  const chat = list.find(m => !EMBED_PATTERNS.test(m.id));
+  return chat ? chat.id : (list[0]?.id || '');
 }
 
 function switchModel(id) { currentModel = id; }
