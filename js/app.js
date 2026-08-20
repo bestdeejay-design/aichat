@@ -258,13 +258,17 @@ function renderMsg(m, i) {
 
 function fmt(text) {
   if (!text) return '';
-  text = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
-    `<pre><button class="cpy" onclick="copy(this.nextSibling.textContent)">⎘</button><code>${esc(code.trimEnd())}</code></pre>`
-  );
-  text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-  text = text.replace(/\*\*(\S[^*]*\S|\S)\*\*/g, '<strong>$1</strong>');
-  text = text.replace(/\*(\S[^*]*\S|\S)\*/g, '<em>$1</em>');
-  return text.split(/\n\n+/).filter(Boolean).map(p => `<p>${esc(p)}</p>`).join('') || '<p></p>';
+  const blocks = [];
+  text = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    blocks.push(`<pre><button class="cpy" onclick="copy(this.nextSibling.textContent)">⎘</button><code>${esc(code.trimEnd())}</code></pre>`);
+    return `\u0000${blocks.length - 1}\u0000`;
+  });
+  let lines = text.split('\n').map(esc).join('\n');
+  lines = lines.replace(/`([^`]+)`/g, '<code>$1</code>');
+  lines = lines.replace(/\*\*(\S[^*]*\S|\S)\*\*/g, '<strong>$1</strong>');
+  lines = lines.replace(/\*(\S[^*]*\S|\S)\*/g, '<em>$1</em>');
+  const html = lines.split(/\n\n+/).filter(Boolean).map(p => `<p>${p}</p>`).join('');
+  return html.replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[+i]) || '<p></p>';
 }
 
 /* ─── SEND ─── */
