@@ -14,7 +14,7 @@
   <header id="topBar">
     <div class="top-left">
       <span class="brand">AI Chat</span>
-      <span class="ver" id="versionBadge">v1.1.1</span>
+      <span class="ver" id="versionBadge">v1.2.0</span>
       <select id="modelSelect" onchange="switchModel(this.value)" title="Модель"></select>
     </div>
     <div class="top-right">
@@ -46,6 +46,7 @@
           <span class="parrow">→</span>
         </button>
       </div>
+      <p class="onboard-hint">🔒 Ключ хранится только в вашем браузере и не покидает это устройство</p>
       <button class="btn-text" onclick="toggleSettings()">Другой провайдер</button>
     </div>
 
@@ -100,6 +101,7 @@
             <input id="apiKey" type="password" placeholder="sk-...">
             <button class="btn-icon" onclick="toggleKeyVis()" title="Показать">👁️</button>
           </div>
+          <a class="key-help" id="keyHelp" href="#" target="_blank" rel="noopener">Где взять ключ →</a>
         </div>
         <details class="advanced-details">
           <summary>Ещё</summary>
@@ -119,6 +121,7 @@
           </div>
         </details>
         <button class="btn-primary" onclick="saveSettings()">Подключить</button>
+        <button class="btn-danger" id="clearKeyBtn" onclick="clearKey()" title="Удалить ключ и все настройки">Удалить ключ и настройки</button>
       </div>
     </div>
   </div>

@@ -3,11 +3,11 @@
    ═══════════════════════════════════════════ */
 
 const PROVIDERS = {
-  github:    { name:'GitHub Models',  url:'https://models.inference.ai.azure.com',          key:'' },
-  deepseek:  { name:'DeepSeek',       url:'https://api.deepseek.com',                       key:'' },
-  openrouter:{ name:'OpenRouter',     url:'https://openrouter.ai/api/v1',                   key:'' },
-  openai:    { name:'OpenAI',         url:'https://api.openai.com/v1',                      key:'' },
-  groq:      { name:'Groq',           url:'https://api.groq.com/openai/v1',                 key:'' }
+  github:    { name:'GitHub Models',  url:'https://models.inference.ai.azure.com',          key:'', keys:'https://github.com/settings/tokens' },
+  deepseek:  { name:'DeepSeek',       url:'https://api.deepseek.com',                       key:'', keys:'https://platform.deepseek.com/api_keys' },
+  openrouter:{ name:'OpenRouter',     url:'https://openrouter.ai/api/v1',                   key:'', keys:'https://openrouter.ai/keys' },
+  openai:    { name:'OpenAI',         url:'https://api.openai.com/v1',                      key:'', keys:'https://platform.openai.com/api-keys' },
+  groq:      { name:'Groq',           url:'https://api.groq.com/openai/v1',                 key:'', keys:'https://console.groq.com/keys' }
 };
 
 // Embedding models to exclude from chat model list
@@ -50,6 +50,8 @@ function loadSettings() {
   $('systemPrompt').value = settings.systemPrompt || '';
   $('temperature').value = settings.temperature ?? 0.7;
   $('maxTokens').value = settings.maxTokens ?? 4096;
+  updateKeyHelp(Object.keys(PROVIDERS).find(id => PROVIDERS[id].url === settings.url));
+  $('clearKeyBtn').style.display = settings.key ? '' : 'none';
 }
 
 function saveSettings() {
@@ -60,14 +62,15 @@ function saveSettings() {
   settings.temperature = parseFloat($('temperature').value) || 0.7;
   settings.maxTokens = parseInt($('maxTokens').value) || 4096;
   localStorage.setItem('aichat_settings', JSON.stringify(settings));
+  updateKeyHelp(Object.keys(PROVIDERS).find(id => PROVIDERS[id].url === settings.url));
   toggleSettings();
   connect();
 }
 
-function toggleSettings() {
+function toggleSettings(keep) {
   const o = $('settingsOverlay');
   o.style.display = o.style.display === 'none' ? 'flex' : 'none';
-  if (o.style.display === 'flex') loadSettings();
+  if (o.style.display === 'flex' && !keep) loadSettings();
 }
 
 function toggleKeyVis() {
@@ -82,6 +85,7 @@ function applyPreset() {
   if (!p) return;
   $('providerName').value = p.name;
   $('apiUrl').value = p.url;
+  updateKeyHelp(v);
 }
 
 function quickConnect(id) {
@@ -89,7 +93,43 @@ function quickConnect(id) {
   if (!p) return;
   $('providerName').value = p.name;
   $('apiUrl').value = p.url;
+  updateKeyHelp(id);
+  toggleSettings(true);
+}
+
+/* ─── ONBOARDING / KEY HELP ─── */
+function updateKeyHelp(id) {
+  const link = $('keyHelp');
+  if (!link) return;
+  const keys = (id && PROVIDERS[id]) ? PROVIDERS[id].keys : '';
+  if (keys) {
+    link.href = keys;
+    link.style.display = '';
+  } else {
+    link.href = '#';
+    link.style.display = 'none';
+  }
+}
+
+function clearKey() {
+  if (!confirm('Удалить ключ и все настройки? Ключ нельзя будет восстановить.')) return;
+  localStorage.removeItem('aichat_settings');
+  localStorage.removeItem('aichat_models');
+  localStorage.removeItem('aichat_messages');
+  settings = { provider:'', url:'', key:'', systemPrompt:'', temperature:0.7, maxTokens:4096 };
+  models = [];
+  currentModel = '';
+  messages = [];
+  streaming = false;
+  if (abortCtrl) abortCtrl.abort();
+  $('chatLayout').style.display = 'none';
+  $('welcomeScreen').style.display = '';
+  $('chatMessages').innerHTML = '';
+  $('modelSelect').innerHTML = '';
+  $('providerPill').textContent = '—';
   toggleSettings();
+  loadSettings();
+  toast('Ключ и данные удалены', 'success');
 }
 
 /* ─── CONNECT ─── */
@@ -141,7 +181,7 @@ async function refreshModels() {
       toast('Кэш моделей', 'success');
       return true;
     }
-    toast(e.message, 'error');
+    toast(`${e.message}. Проверьте ключ и endpoint`, 'error');
     return false;
   }
 }

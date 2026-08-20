@@ -87,6 +87,21 @@ body {
   cursor: pointer;
 }
 .btn-primary:hover { opacity: 0.9; }
+.btn-danger {
+  padding: 10px 20px; border-radius: 8px; border: 1px solid rgba(231,76,60,0.35);
+  background: transparent; color: #e74c3c; font: 600 12px var(--font);
+  cursor: pointer; transition: all 0.15s;
+}
+.btn-danger:hover { background: rgba(231,76,60,0.1); border-color: #e74c3c; }
+.onboard-hint {
+  font-size: 11px !important; color: var(--text3) !important;
+  max-width: 340px; line-height: 1.5;
+}
+.key-help {
+  font-size: 11px; color: var(--accent); text-decoration: none;
+  margin-top: 2px; display: inline-flex; align-items: center; gap: 4px;
+}
+.key-help:hover { text-decoration: underline; }
 
 /* ─── CHAT ─── */
 .chat-layout { flex: 1; min-height: 0; display: flex; flex-direction: row; }
