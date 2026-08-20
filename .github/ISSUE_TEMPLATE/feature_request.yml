@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest an idea for AI Chat
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for the idea! Describe the problem you want to solve.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is the use case or pain point?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How should it work?
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - New provider / endpoint support
+        - UI / UX improvement
+        - Security / privacy improvement
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      options:
+        - label: I'm OK with a dependency-free implementation (no build tools, no frameworks)

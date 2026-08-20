@@ -1,0 +1,57 @@
+name: Bug report
+description: Report a bug in AI Chat
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting! Please fill in the details below.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Version badge shown in the top bar (e.g. v1.2.0)
+      placeholder: v1.2.0
+    validations:
+      required: true
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Firefox
+        - Safari
+        - Edge
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How did you run the app and what did you do?
+      placeholder: |
+        1. Run `python3 -m http.server 8080`
+        2. Open http://localhost:8080
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the error message shown in the toast, if any
+    validations:
+      required: true
+  - type: textarea
+    id: provider
+    attributes:
+      label: Provider and endpoint
+      description: Which provider/endpoint were you using? (key is not needed)
